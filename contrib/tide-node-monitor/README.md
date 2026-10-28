@@ -1,42 +1,78 @@
-# Tidecoin local node monitor (v0.1 prototype)
+# Tidecoin local node monitor (v0.2 prototype)
 
-A read-only command-line monitor for a **locally operated** Tidecoin node.
+A **read-only** Python command-line monitor for a locally operated Tidecoin node.
 It does not modify consensus, wallet state, transactions, or mining settings.
 
 ## Requirements
-- Python 3.9+
-- A running Tidecoin node with local JSON-RPC enabled
-- RPC credentials configured in the node (use dedicated credentials if supported)
+- Python 3.9+ (no third-party packages)
+- A running Tidecoin node with local JSON-RPC enabled for live monitoring
+- RPC credentials configured in the node
 
-## Run
+## Run on Windows PowerShell
 
-Set the following environment variables in your shell (do not commit passwords):
+Open PowerShell in the repository root. Replace the RPC port with the actual
+port from your Tidecoin node configuration; do not confuse it with the P2P port.
 
-- `TIDE_RPC_URL`: your local node RPC URL, for example `http://127.0.0.1:<your-rpc-port>`
-- `TIDE_RPC_USER`: RPC username
-- `TIDE_RPC_PASSWORD`: RPC password
-- `TIDE_RPC_TIMEOUT`: optional timeout in seconds (default 8)
+```powershell
+$env:TIDE_RPC_URL = "http://127.0.0.1:YOUR_RPC_PORT"
+$env:TIDE_RPC_USER = "YOUR_RPC_USER"
+$env:TIDE_RPC_PASSWORD = "YOUR_RPC_PASSWORD"
+py -3 contrib/tide-node-monitor/monitor.py
+```
 
-Then run:
+Remove the temporary variables from that PowerShell session after use:
+
+```powershell
+Remove-Item Env:TIDE_RPC_PASSWORD
+Remove-Item Env:TIDE_RPC_USER
+```
+
+**Caution:** Setting secrets interactively may expose them in terminal history.
+Do not share screenshots of credentials or commit them to GitHub. Prefer a
+dedicated local RPC account when available.
+
+## Run on Linux/macOS
+
+Set `TIDE_RPC_URL`, `TIDE_RPC_USER`, and `TIDE_RPC_PASSWORD`
+in your process environment, then:
 
 ```sh
 python3 contrib/tide-node-monitor/monitor.py
 ```
 
-The prototype defaults to port 8754 as an **unverified convenience value**.
-Check your node's actual RPC port before use. The P2P port (8755 in the
-project README) is **not** necessarily the RPC port.
+Optional: `TIDE_RPC_TIMEOUT` in seconds, greater than 0 and at most 60
+(default 8). The fallback port 8754 is **not verified** for Tidecoin;
+explicitly configure the correct local RPC port. The project's documented
+P2P port (8755) is not necessarily the RPC port.
+
+## Run offline tests (no node or credentials required)
+
+Windows:
+
+```powershell
+py -3 -m unittest discover -s contrib/tide-node-monitor -p "test_*.py" -v
+```
+
+Linux/macOS:
+
+```sh
+python3 -m unittest discover -s contrib/tide-node-monitor -p 'test_*.py' -v
+```
 
 ## Output
-JSON with chain name, block and header heights, verification progress,
-initial download state, peer count, estimated network hashrate and difficulty.
-Fields unavailable in a given node version may be null.
+
+JSON containing chain name, block/header heights, verification progress,
+initial download status, peer count, estimated network hashrate and difficulty.
+Missing fields may be null depending on node version.
 
 ## Safety and limitations
-- Only loopback HTTP RPC URLs are accepted; never expose RPC publicly.
-- Credentials are read from environment variables, never hard-coded.
+
+- Only loopback HTTP RPC endpoints with explicit ports are accepted.
+- Only three read-only RPC methods are permitted.
+- HTTP proxies are disabled for RPC requests.
 - No wallet RPC calls, private keys, or transactions are used.
-- Error output intentionally avoids raw HTTP messages that may contain secrets.
-- This is a prototype; it has **not** been tested against a running Tidecoin node.
-- Future work: mock RPC unit tests, explicit cookie-auth support, periodic
+- Errors do not print raw HTTP response bodies, credentials, or URLs.
+- Offline tests use mocks; a **real Tidecoin node integration test has not
+  yet been performed**.
+- Planned improvements: redirect prevention, cookie authentication, periodic
   sampling, stale-tip detection, and a local browser dashboard.
