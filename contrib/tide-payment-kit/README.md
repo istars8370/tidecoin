@@ -50,3 +50,22 @@ py -3 -m unittest discover -s contrib/tide-payment-kit -p "test_*.py" -v
 
 This contribution is developed in a personal fork. It is not endorsed by
 Tidecoin maintainers and does not modify Tidecoin consensus or wallet code.
+
+## v0.2: Offline decoded-transaction validation
+
+`transaction_validation.py` checks a decoded transaction object's txid,
+unique output indexes, output values, and exact decoded destination address.
+It sums multiple outputs to the same invoice address, using decimal arithmetic.
+`test_transaction_validation.py` covers valid and invalid examples.
+
+**This is NOT independent blockchain verification.** An attacker can fabricate
+a JSON object containing any txid, output, or confirmation count. Only a trusted
+Tidecoin node can supply authoritative observations, and the application must
+check the correct network, active-chain inclusion, reorgs, and confirmations.
+The validator currently relies on decoded address fields, whose exact format
+must be checked against Tidecoin's actual RPC responses.
+
+A GitHub Actions workflow was added to execute the offline unit tests on the
+personal fork. Workflow execution results have not yet been verified.
+
+Do not accept merchant payments or issue final receipts using this prototype.
