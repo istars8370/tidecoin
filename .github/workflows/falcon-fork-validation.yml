@@ -1,0 +1,41 @@
+name: Fork Falcon regression validation
+
+on:
+  push:
+    branches:
+      - ci/falcon-fork-validation
+
+permissions:
+  contents: read
+
+concurrency:
+  group: falcon-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  falcon-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install minimal build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkgconf libevent-dev libboost-dev
+      - name: Configure tests without wallet, GUI, or IPC
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTS=ON \
+            -DBUILD_GUI=OFF \
+            -DENABLE_WALLET=OFF \
+            -DENABLE_IPC=OFF \
+            -DBUILD_BENCH=OFF
+      - name: Build unit test binary
+        run: cmake --build build --target test_tidecoin --parallel 2
+      - name: Run Falcon regression suite
+        run: |
+          ./build/bin/test_tidecoin --run_test=pq_random_key_tests/falcon_strict_sign_retry_at_last_attempt --log_level=test_suite
