@@ -76,3 +76,29 @@ Missing fields may be null depending on node version.
   yet been performed**.
 - Planned improvements: redirect prevention, cookie authentication, periodic
   sampling, stale-tip detection, and a local browser dashboard.
+
+## Browser dashboard (v0.3)
+
+The local dashboard runs on loopback only. In PowerShell, after configuring the
+Tidecoin RPC environment variables as described above, start it from the
+repository root:
+
+```powershell
+py -3 contrib/tide-node-monitor/dashboard.py
+```
+
+Open `http://127.0.0.1:8766/` in a browser on **the same computer**.
+Use Ctrl+C to stop. Override the browser port with `TIDE_DASHBOARD_PORT`
+if needed (1024–65535). The page polls every 15 seconds and displays RPC
+connection errors without exposing credentials.
+
+The dashboard requires a running Tidecoin node for live data. The offline
+tests use a mocked node and can run without one:
+
+```powershell
+py -3 -m unittest discover -s contrib/tide-node-monitor -p "test_*.py" -v
+```
+
+The dashboard is a local developer prototype, not a public hosting service.
+Do not expose its port through firewall rules, proxies, or tunnels.
+The RPC port must be checked against the actual Tidecoin configuration.
