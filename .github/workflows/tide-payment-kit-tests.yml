@@ -1,0 +1,25 @@
+name: Tide Payment Kit offline tests
+
+on:
+  push:
+    branches:
+      - feat/tide-payment-kit-v01
+  pull_request:
+    paths:
+      - 'contrib/tide-payment-kit/**'
+      - '.github/workflows/tide-payment-kit-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run offline unit tests
+        run: python -m unittest discover -s contrib/tide-payment-kit -p 'test_*.py' -v
