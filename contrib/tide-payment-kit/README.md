@@ -69,3 +69,33 @@ A GitHub Actions workflow was added to execute the offline unit tests on the
 personal fork. Workflow execution results have not yet been verified.
 
 Do not accept merchant payments or issue final receipts using this prototype.
+
+## v0.3: Local RPC inspection prototype
+
+`rpc_client.py` provides a restricted local JSON-RPC client for
+`getblockchaininfo`, `getrawtransaction` and `getblockheader`.
+It requires an explicit expected network, checks a transaction's block hash,
+compares transaction and active-chain header confirmation counts, and passes
+decoded outputs to the offline validator.
+
+**Do not use for real merchant settlement.** The code has not been tested
+against a real Tidecoin node. A transaction index may be required to query
+arbitrary confirmed transactions, depending on node configuration. Actual
+Tidecoin RPC response formats and ports still require verification.
+The fallback RPC port 8754 is unverified; set `TIDE_RPC_URL` to the actual
+local RPC endpoint and use `TIDE_RPC_USER`/`TIDE_RPC_PASSWORD` credentials.
+Never expose RPC externally or commit credentials.
+
+There is no automatic invoice settlement or receipt generation.
+This prototype cannot handle chain reorganization after a payment was
+previously observed, invoice persistence, multiple independent payment
+transactions, or guaranteed payment finality. The caller must persist and
+reconcile observations against the active chain before any production use.
+
+Run all offline tests:
+
+```sh
+python3 -m unittest discover -s contrib/tide-payment-kit -p 'test_*.py' -v
+```
+
+The tests are mocked and **have not yet been confirmed passing**.
