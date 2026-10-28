@@ -114,9 +114,14 @@ BOOST_AUTO_TEST_CASE(falcon_strict_sign_retry_at_last_attempt)
         // The final allowed attempt must still be available after forced failures.
         pq::SetFalconSignTestFailCount(static_cast<int>(pq::kFalconSignMaxAttempts - 1));
         std::vector<unsigned char> sig;
-        BOOST_CHECK(pq::Sign(*info, msg, sk, sig, /*legacy_mode=*/false));
+        BOOST_REQUIRE(pq::Sign(*info, msg, sk, sig, /*legacy_mode=*/false));
         BOOST_CHECK_EQUAL(pq::GetFalconSignTestFailCount(), 0);
-        BOOST_CHECK(!sig.empty());
+        BOOST_REQUIRE(!sig.empty());
+        BOOST_CHECK(pq::Verify(*info, msg, sig, pk, /*legacy_mode=*/false));
+
+        auto modified_msg = msg;
+        modified_msg[0] ^= 0x01;
+        BOOST_CHECK(!pq::Verify(*info, modified_msg, sig, pk, /*legacy_mode=*/false));
     }
 }
 
