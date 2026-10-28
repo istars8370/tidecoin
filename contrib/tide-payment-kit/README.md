@@ -99,3 +99,25 @@ python3 -m unittest discover -s contrib/tide-payment-kit -p 'test_*.py' -v
 ```
 
 The tests are mocked and **have not yet been confirmed passing**.
+
+## v0.4: Durable local observation journal
+
+`payment_journal.py` adds an experimental SQLite-backed append-only
+observation history. `test_payment_journal.py` covers idempotent invoice
+registration, duplicate transaction claims, persistence after reopening,
+and reorganization-related review flags.
+
+The journal deliberately uses `candidate_paid`, **not final settlement**.
+A transaction ID may only be claimed by one invoice in this prototype.
+Repeated identical observations are ignored; changed observations are appended.
+A change of block hash or any orphaned/review event makes
+`needs_review(invoice_id)` true. Review flags are conservative and are
+not automatically cleared.
+
+**Important:** Journal input is caller-supplied and untrusted unless verified
+independently against a healthy authenticated node. This module does not
+automatically call `inspect_payment`, does not enforce chain identity, and
+does not provide crash-safe multi-node reconciliation, signed receipts, a
+complete reorg recovery policy, encryption, or a merchant-ready ledger.
+Never use it to release goods or recognize revenue automatically.
+Back up and protect the SQLite file: it contains order metadata.
