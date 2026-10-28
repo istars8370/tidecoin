@@ -11,6 +11,11 @@ import urllib.request
 METHODS = ("getblockchaininfo", "getnetworkinfo", "getmininginfo")
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
 def local_rpc_url():
     url = os.environ.get("TIDE_RPC_URL", "http://127.0.0.1:8754")
     parsed = urllib.parse.urlsplit(url)
@@ -47,7 +52,7 @@ def rpc(method):
         method="POST",
     )
     # Disable proxy use: local credentials must never be forwarded to a proxy.
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
     with opener.open(request, timeout=timeout) as response:
         body = json.load(response)
     if not isinstance(body, dict) or body.get("error") or not isinstance(body.get("result"), dict):
