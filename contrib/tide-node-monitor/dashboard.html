@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TIDE Node Monitor</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif;background:#0c1220;color:#e8eefb}
+body{max-width:1040px;margin:0 auto;padding:32px 20px}
+header{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:clamp(24px,4vw,36px);margin:0}p{color:#9dacc6}
+#state{font-weight:700;border-radius:100px;background:#263249;padding:8px 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:28px}
+article{background:#19253a;border:1px solid #30415c;border-radius:16px;padding:20px}
+article small{color:#9aacca;display:block;margin-bottom:12px}
+article strong{font-size:clamp(22px,3vw,30px);overflow-wrap:anywhere}
+footer{margin-top:28px;color:#9dacc6;font-size:14px}
+button{background:#385b9b;color:white;border:0;border-radius:8px;padding:9px 14px;cursor:pointer}
+</style>
+</head>
+<body>
+<header><div><h1>TIDE Node Monitor</h1><p>Local read-only node dashboard · v0.3 prototype</p></div><span id="state" role="status" aria-live="polite">Connecting...</span></header>
+<div class="grid">
+<article><small>Chain</small><strong id="chain">—</strong></article>
+<article><small>Block height</small><strong id="blocks">—</strong></article>
+<article><small>Header height</small><strong id="headers">—</strong></article>
+<article><small>Sync progress</small><strong id="progress">—</strong></article>
+<article><small>Connected peers</small><strong id="peers">—</strong></article>
+<article><small>Network hash rate (H/s)</small><strong id="hash">—</strong></article>
+<article><small>Difficulty</small><strong id="difficulty">—</strong></article>
+<article><small>Initial block download</small><strong id="ibd">—</strong></article>
+</div>
+<footer><button id="refresh">Refresh now</button> <span id="updated">Not updated yet</span><p>Refreshes every 15 seconds. The dashboard does not send transactions or expose RPC credentials to the browser.</p></footer>
+<script>
+"use strict";
+const byId=id=>document.getElementById(id);
+const fmt=v=>typeof v==="number"&&Number.isFinite(v)?v.toLocaleString("en-US",{maximumFractionDigits:4}):(v==null?"—":String(v));
+const fields={chain:"chain",blocks:"blocks",headers:"headers",peers:"connections",hash:"network_hashps",difficulty:"difficulty"};
+let inFlight=false;
+async function refresh(){
+  if(inFlight)return;
+  inFlight=true;
+  try{
+    const response=await fetch("/api/status",{cache:"no-store"});
+    const payload=await response.json();
+    if(!response.ok||!payload.ok)throw Error("unavailable");
+    const d=payload.data;
+    for(const [element,key] of Object.entries(fields))byId(element).textContent=fmt(d[key]);
+    byId("progress").textContent=typeof d.verification_progress==="number"?fmt(d.verification_progress*100)+"%":"—";
+    byId("ibd").textContent=d.initial_block_download===true?"Yes":d.initial_block_download===false?"No":"—";
+    byId("state").textContent="Connected";
+    byId("updated").textContent="Last updated: "+new Date().toLocaleTimeString();
+  }catch{
+    byId("state").textContent="RPC unavailable";
+    byId("updated").textContent="Could not retrieve node status";
+    for(const id of [...Object.keys(fields),"progress","ibd"])byId(id).textContent="—";
+  }finally{inFlight=false}
+}
+byId("refresh").addEventListener("click",refresh);
+refresh();setInterval(refresh,15000);
+</script>
+</body>
+</html>
