@@ -36,6 +36,12 @@ jobs:
             -DBUILD_BENCH=OFF
       - name: Build unit test binary
         run: cmake --build build --target test_tidecoin --parallel 2
-      - name: Run Falcon regression suite
+      - name: Run all Falcon key and signing regression tests
         run: |
-          ./build/bin/test_tidecoin --run_test=pq_random_key_tests/falcon_strict_sign_retry_at_last_attempt --log_level=test_suite
+          ./build/bin/test_tidecoin --run_test=pq_random_key_tests --log_level=test_suite
+      - name: Run PQHD key generation tests
+        run: |
+          ./build/bin/test_tidecoin --run_test=pqhd_keygen_tests --log_level=test_suite
+      - name: Run PQ multisignature tests
+        run: |
+          ./build/bin/test_tidecoin --run_test=pq_multisig_tests --log_level=test_suite
