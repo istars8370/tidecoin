@@ -25,7 +25,7 @@ def _satoshis(value):
     return int(d * 100_000_000)
 
 
-def verify_transaction(invoice, tx, *, expected_chain=None):
+def verify_transaction(invoice, tx):
     """Return a validated observation dict or raise TransactionValidationError.
 
     The caller must fetch tx from a trusted, authenticated Tidecoin node and
