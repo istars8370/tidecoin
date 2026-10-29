@@ -121,3 +121,29 @@ does not provide crash-safe multi-node reconciliation, signed receipts, a
 complete reorg recovery policy, encryption, or a merchant-ready ledger.
 Never use it to release goods or recognize revenue automatically.
 Back up and protect the SQLite file: it contains order metadata.
+
+
+## v0.5 — Conservative integration (prototype)
+
+`payment_service.py` connects invoice registration, read-only RPC transaction
+inspection, and SQLite observation journaling. It classifies observations as
+`confirming`, `candidate_paid`, or `review_required` and returns
+`settlement_authorized: false` **in every case**. This is not a payment
+acceptance service. No goods should be released based on this result alone.
+
+`record_orphan` provides an explicit manual reorg marker; **RPC errors are
+never interpreted as reorg proof**. Historical contradictions remain flagged
+for human review. Only already-confirmed transactions are supported.
+
+Run offline tests from the repository root:
+
+```sh
+python -m unittest discover -s contrib/tide-payment-kit -p 'test_*.py' -v
+```
+
+**Limitations:** No unique chain-validated invoice address generation, no
+transaction discovery, no persistent chain identity, no independent proof of
+canonicality, no automatic reorg reconciliation, no settlement approval, and
+no real-merchant security audit. Local RPC port and network name must be
+verified against the running Tidecoin node. Tests are mocked and do not prove
+mainnet compatibility.
