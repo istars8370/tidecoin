@@ -45,6 +45,30 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(JournalError):
             self.journal.register(other)
 
+    def test_integrity_report_clean(self):
+        report = self.journal.diagnose_integrity()
+        self.assertTrue(report["integrity_ok"])
+        self.assertEqual(report["duplicate_addresses"], [])
+        self.assertEqual(report["foreign_key_issue_count"], 0)
+
+    def test_integrity_report_detects_legacy_duplicates(self):
+        self.journal.db.execute(
+            "INSERT INTO invoices VALUES (?,?,?,?,?)",
+            ("legacy-2", "example-address", "2", 100, 200))
+        self.journal.db.commit()
+        report = self.journal.diagnose_integrity()
+        self.assertEqual(report["duplicate_addresses"],
+                         [{"address": "example-address", "invoice_count": 2}])
+
+    def test_second_connection_rejects_shared_address(self):
+        second = PaymentJournal(self.path)
+        try:
+            other = new_invoice("order-2", "example-address", "2", 100, 200)
+            with self.assertRaises(JournalError):
+                second.register(other)
+        finally:
+            second.close()
+
     def test_record_and_duplicate_idempotence(self):
         self.assertTrue(self.journal.record("order-1", TX, "1.25", 6, BLOCK_A,
                                             "candidate_paid", observed_at=120))
