@@ -73,6 +73,7 @@ class JournalTests(unittest.TestCase):
         import threading
         barrier = threading.Barrier(2)
         outcomes = []
+        failures = []
         lock = threading.Lock()
 
         def attempt(number):
@@ -89,6 +90,9 @@ class JournalTests(unittest.TestCase):
                     result = "rejected"
                 with lock:
                     outcomes.append(result)
+            except Exception as exc:
+                with lock:
+                    failures.append(repr(exc))
             finally:
                 journal.close()
 
@@ -98,6 +102,7 @@ class JournalTests(unittest.TestCase):
         for worker in workers:
             worker.join(timeout=15)
         self.assertTrue(all(not worker.is_alive() for worker in workers))
+        self.assertEqual(failures, [], "Worker failures: " + repr(failures))
         self.assertCountEqual(outcomes, ["registered", "rejected"])
         count = self.journal.db.execute(
             "SELECT COUNT(*) FROM invoices WHERE address=?",
