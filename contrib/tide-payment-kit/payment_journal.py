@@ -65,6 +65,14 @@ class PaymentJournal:
                 if existing != values:
                     raise JournalError("Invoice ID already belongs to another order")
                 return False
+            # A shared address makes invoice attribution ambiguous. Reject new
+            # registrations instead of silently allowing double attribution.
+            conflict = self.db.execute(
+                "SELECT invoice_id FROM invoices WHERE address=? LIMIT 1",
+                (invoice.address,)
+            ).fetchone()
+            if conflict is not None:
+                raise JournalError("Payment address already assigned to another invoice")
             self.db.execute("INSERT INTO invoices VALUES (?,?,?,?,?)", values)
             return True
 
