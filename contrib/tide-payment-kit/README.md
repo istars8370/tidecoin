@@ -202,3 +202,20 @@ retroactively migrate or repair them. Multiple payment outputs or transactions,
 address reuse outside this database, and concurrent processes require further
 reconciliation design. Offline tests for this behavior have been added but
 execution results remain unverified until CI finishes.
+
+### v0.6 third-pass stabilization (verification pending)
+
+Invoice registration now uses `BEGIN IMMEDIATE` to serialize competing
+SQLite writers before checking address collisions. A read-only
+`PaymentJournal.diagnose_integrity()` report checks SQLite integrity,
+foreign-key violations and legacy duplicate addresses without modifying data.
+An address lookup index supports the collision check; it is intentionally
+non-unique to avoid breaking opening of legacy databases that contain
+pre-existing duplicates. Tests cover diagnostics and separate connections.
+
+**Verification blocked:** The local checkout could not be cloned because the
+runtime could not resolve github.com. GitHub Actions runs for the previous
+commit were queued when checked. Therefore neither local test pass nor CI
+success is claimed. Inspect PR #2 checks and run the full unittest suite
+before merging. The second-connection test is not a simultaneous multi-process
+stress test. Existing legacy duplicate addresses require manual remediation.
