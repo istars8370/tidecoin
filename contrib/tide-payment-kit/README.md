@@ -191,3 +191,14 @@ been established in this branch. Offline mocks do not establish settlement
 safety. A shared payment address across invoices is ambiguous and requires
 separate reconciliation design. Chain identity is not persisted in the journal.
 There is no merchant-ready settlement approval or automatic reorg recovery.
+
+### v0.6 follow-up: invoice address collision protection
+
+New invoice registrations now reject reuse of an address already assigned to
+another invoice in the same SQLite journal. This is a conservative prototype
+constraint, **not** a substitute for chain-validated unique address generation.
+Legacy databases may already contain duplicate addresses; this change does not
+retroactively migrate or repair them. Multiple payment outputs or transactions,
+address reuse outside this database, and concurrent processes require further
+reconciliation design. Offline tests for this behavior have been added but
+execution results remain unverified until CI finishes.
