@@ -28,6 +28,87 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(JournalError):
             self.journal.register(different)
 
+    def test_shared_address_rejected_for_other_invoice(self):
+        other = new_invoice("order-2", "example-address", "2", 100, 200)
+        with self.assertRaises(JournalError):
+            self.journal.register(other)
+        self.assertEqual(self.journal.history("order-2"), [])
+
+    def test_distinct_address_registration_allowed(self):
+        other = new_invoice("order-2", "different-address", "2", 100, 200)
+        self.assertTrue(self.journal.register(other))
+
+    def test_shared_address_rejected_after_reopen(self):
+        self.journal.close()
+        self.journal = PaymentJournal(self.path)
+        other = new_invoice("order-2", "example-address", "2", 100, 200)
+        with self.assertRaises(JournalError):
+            self.journal.register(other)
+
+    def test_integrity_report_clean(self):
+        report = self.journal.diagnose_integrity()
+        self.assertTrue(report["integrity_ok"])
+        self.assertEqual(report["duplicate_addresses"], [])
+        self.assertEqual(report["foreign_key_issue_count"], 0)
+
+    def test_integrity_report_detects_legacy_duplicates(self):
+        self.journal.db.execute(
+            "INSERT INTO invoices VALUES (?,?,?,?,?)",
+            ("legacy-2", "example-address", "2", 100, 200))
+        self.journal.db.commit()
+        report = self.journal.diagnose_integrity()
+        self.assertEqual(report["duplicate_addresses"],
+                         [{"address": "example-address", "invoice_count": 2}])
+
+    def test_second_connection_rejects_shared_address(self):
+        second = PaymentJournal(self.path)
+        try:
+            other = new_invoice("order-2", "example-address", "2", 100, 200)
+            with self.assertRaises(JournalError):
+                second.register(other)
+        finally:
+            second.close()
+
+    def test_parallel_writers_cannot_claim_same_address(self):
+        import threading
+        barrier = threading.Barrier(2)
+        outcomes = []
+        failures = []
+        lock = threading.Lock()
+
+        def attempt(number):
+            journal = PaymentJournal(self.path)
+            invoice = new_invoice(
+                "parallel-" + str(number), "parallel-shared-address",
+                "2", 100, 200)
+            try:
+                barrier.wait(timeout=5)
+                try:
+                    journal.register(invoice)
+                    result = "registered"
+                except JournalError:
+                    result = "rejected"
+                with lock:
+                    outcomes.append(result)
+            except Exception as exc:
+                with lock:
+                    failures.append(repr(exc))
+            finally:
+                journal.close()
+
+        workers = [threading.Thread(target=attempt, args=(i,)) for i in range(2)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join(timeout=15)
+        self.assertTrue(all(not worker.is_alive() for worker in workers))
+        self.assertEqual(failures, [], "Worker failures: " + repr(failures))
+        self.assertCountEqual(outcomes, ["registered", "rejected"])
+        count = self.journal.db.execute(
+            "SELECT COUNT(*) FROM invoices WHERE address=?",
+            ("parallel-shared-address",)).fetchone()[0]
+        self.assertEqual(count, 1)
+
     def test_record_and_duplicate_idempotence(self):
         self.assertTrue(self.journal.record("order-1", TX, "1.25", 6, BLOCK_A,
                                             "candidate_paid", observed_at=120))

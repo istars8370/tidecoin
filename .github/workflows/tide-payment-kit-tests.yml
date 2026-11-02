@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/tide-payment-kit-v01
+      - feat/tide-payment-kit-v06
   pull_request:
     paths:
       - 'contrib/tide-payment-kit/**'

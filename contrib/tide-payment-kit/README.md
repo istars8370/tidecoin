@@ -147,3 +147,75 @@ canonicality, no automatic reorg reconciliation, no settlement approval, and
 no real-merchant security audit. Local RPC port and network name must be
 verified against the running Tidecoin node. Tests are mocked and do not prove
 mainnet compatibility.
+
+
+## v0.6 — RPC hardening (work in progress)
+
+The v0.6 branch adds a bounded (2 MiB) JSON-RPC response reader, validates
+JSON-RPC envelopes and response IDs, avoids including server exceptions in
+errors, rejects non-string transaction identifiers and block hashes, and
+requires an explicitly configured local RPC endpoint. It also adds offline
+mock security tests in `test_rpc_security.py`.
+
+**Source-verified default RPC ports:** upstream
+`src/chainparamsbase.cpp` currently specifies mainnet **7585**, testnet
+**17585**, regtest **17595**. The earlier prototype fallback **8754 was not
+verified and has been removed**. Set `TIDE_RPC_URL` explicitly, e.g.
+`http://127.0.0.1:7585` only after checking the node's actual config.
+The expected chain string is provided explicitly to the inspection function;
+verify its exact value with the running node.
+
+Run tests (from repository root):
+
+```sh
+python3 -m unittest discover -s contrib/tide-payment-kit -p 'test_*.py' -v
+```
+
+### Read-only node diagnostic checklist (not executed)
+
+1. Start an independently managed, fully synced Tidecoin node with RPC bound
+   to loopback; do not expose RPC on the public network.
+2. Configure `TIDE_RPC_URL`, `TIDE_RPC_USER` and `TIDE_RPC_PASSWORD`
+   outside the repository. Do not put secrets in logs or commits.
+3. Confirm `getblockchaininfo` returns expected chain, block height and
+   synchronization status; check `initialblockdownload` and headers.
+4. With a known historical public transaction ID, test read-only
+   `getrawtransaction` and `getblockheader`; verify response shape.
+5. If historical transaction lookup fails, investigate `txindex` and the
+   node's pruning/configuration before assuming the transaction is absent.
+6. Confirm all diagnostics remain read-only. Never use private keys, wallet
+   operations, send/broadcast RPCs or merchant funds.
+
+**Unverified:** Local test execution and live-node RPC compatibility have not
+been established in this branch. Offline mocks do not establish settlement
+safety. A shared payment address across invoices is ambiguous and requires
+separate reconciliation design. Chain identity is not persisted in the journal.
+There is no merchant-ready settlement approval or automatic reorg recovery.
+
+### v0.6 follow-up: invoice address collision protection
+
+New invoice registrations now reject reuse of an address already assigned to
+another invoice in the same SQLite journal. This is a conservative prototype
+constraint, **not** a substitute for chain-validated unique address generation.
+Legacy databases may already contain duplicate addresses; this change does not
+retroactively migrate or repair them. Multiple payment outputs or transactions,
+address reuse outside this database, and concurrent processes require further
+reconciliation design. Offline tests for this behavior have been added but
+execution results remain unverified until CI finishes.
+
+### v0.6 third-pass stabilization (verification pending)
+
+Invoice registration now uses `BEGIN IMMEDIATE` to serialize competing
+SQLite writers before checking address collisions. A read-only
+`PaymentJournal.diagnose_integrity()` report checks SQLite integrity,
+foreign-key violations and legacy duplicate addresses without modifying data.
+An address lookup index supports the collision check; it is intentionally
+non-unique to avoid breaking opening of legacy databases that contain
+pre-existing duplicates. Tests cover diagnostics and separate connections.
+
+**Verification blocked:** The local checkout could not be cloned because the
+runtime could not resolve github.com. GitHub Actions runs for the previous
+commit were queued when checked. Therefore neither local test pass nor CI
+success is claimed. Inspect PR #2 checks and run the full unittest suite
+before merging. The second-connection test is not a simultaneous multi-process
+stress test. Existing legacy duplicate addresses require manual remediation.

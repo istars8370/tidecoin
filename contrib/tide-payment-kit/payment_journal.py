@@ -2,7 +2,6 @@
 
 No funds, wallet keys, or network calls. This is NOT a settlement ledger.
 """
-import json
 import re
 import sqlite3
 import time
@@ -44,7 +43,7 @@ class PaymentJournal:
                 state TEXT NOT NULL,
                 observed_at INTEGER NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS idx_observations_invoice
+            CREATE INDEX IF NOT EXISTS idx_invoices_address\n                ON invoices(address);\n            CREATE INDEX IF NOT EXISTS idx_observations_invoice
                 ON observations(invoice_id, id);
         """)
         self.db.commit()
@@ -56,17 +55,45 @@ class PaymentJournal:
         # Idempotent registration; conflicting re-use of invoice_id is rejected.
         values = (invoice.invoice_id, invoice.address, str(invoice.amount_tdc),
                   invoice.created_at, invoice.expires_at)
-        with self.db:
-            existing = self.db.execute(
+        # Acquire a write reservation before checking address uniqueness, so\n        # competing writers cannot both pass the check.\n        self.db.execute("BEGIN IMMEDIATE")\n        try:\n            existing = self.db.execute(
                 "SELECT invoice_id,address,amount_tdc,created_at,expires_at "
                 "FROM invoices WHERE invoice_id=?", (invoice.invoice_id,)
             ).fetchone()
             if existing is not None:
                 if existing != values:
                     raise JournalError("Invoice ID already belongs to another order")
-                return False
+                self.db.commit()\n                return False\n            # A shared address makes invoice attribution ambiguous. Reject new
+            # registrations instead of silently allowing double attribution.
+            conflict = self.db.execute(
+                "SELECT invoice_id FROM invoices WHERE address=? LIMIT 1",
+                (invoice.address,)
+            ).fetchone()
+            if conflict is not None:
+                raise JournalError("Payment address already assigned to another invoice")
             self.db.execute("INSERT INTO invoices VALUES (?,?,?,?,?)", values)
+            self.db.commit()
             return True
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def diagnose_integrity(self):
+        """Read-only integrity report; does not repair or modify existing data."""
+        integrity = [row[0] for row in self.db.execute("PRAGMA integrity_check").fetchall()]
+        duplicates = self.db.execute(
+            "SELECT address, COUNT(*) FROM invoices GROUP BY address "
+            "HAVING COUNT(*) > 1 ORDER BY address"
+        ).fetchall()
+        foreign_key_issues = self.db.execute("PRAGMA foreign_key_check").fetchall()
+        return {
+            "integrity_ok": integrity == ["ok"],
+            "integrity_messages": integrity,
+            "duplicate_addresses": [
+                {"address": address, "invoice_count": count}
+                for address, count in duplicates
+            ],
+            "foreign_key_issue_count": len(foreign_key_issues),
+        }
 
     def record(self, invoice_id, txid, amount_tdc, confirmations, blockhash,
                state, observed_at=None):
