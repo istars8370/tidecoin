@@ -69,6 +69,41 @@ class JournalTests(unittest.TestCase):
         finally:
             second.close()
 
+    def test_parallel_writers_cannot_claim_same_address(self):
+        import threading
+        barrier = threading.Barrier(2)
+        outcomes = []
+        lock = threading.Lock()
+
+        def attempt(number):
+            journal = PaymentJournal(self.path)
+            invoice = new_invoice(
+                "parallel-" + str(number), "parallel-shared-address",
+                "2", 100, 200)
+            try:
+                barrier.wait(timeout=5)
+                try:
+                    journal.register(invoice)
+                    result = "registered"
+                except JournalError:
+                    result = "rejected"
+                with lock:
+                    outcomes.append(result)
+            finally:
+                journal.close()
+
+        workers = [threading.Thread(target=attempt, args=(i,)) for i in range(2)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join(timeout=15)
+        self.assertTrue(all(not worker.is_alive() for worker in workers))
+        self.assertCountEqual(outcomes, ["registered", "rejected"])
+        count = self.journal.db.execute(
+            "SELECT COUNT(*) FROM invoices WHERE address=?",
+            ("parallel-shared-address",)).fetchone()[0]
+        self.assertEqual(count, 1)
+
     def test_record_and_duplicate_idempotence(self):
         self.assertTrue(self.journal.record("order-1", TX, "1.25", 6, BLOCK_A,
                                             "candidate_paid", observed_at=120))
