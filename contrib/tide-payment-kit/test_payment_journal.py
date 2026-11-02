@@ -28,6 +28,23 @@ class JournalTests(unittest.TestCase):
         with self.assertRaises(JournalError):
             self.journal.register(different)
 
+    def test_shared_address_rejected_for_other_invoice(self):
+        other = new_invoice("order-2", "example-address", "2", 100, 200)
+        with self.assertRaises(JournalError):
+            self.journal.register(other)
+        self.assertEqual(self.journal.history("order-2"), [])
+
+    def test_distinct_address_registration_allowed(self):
+        other = new_invoice("order-2", "different-address", "2", 100, 200)
+        self.assertTrue(self.journal.register(other))
+
+    def test_shared_address_rejected_after_reopen(self):
+        self.journal.close()
+        self.journal = PaymentJournal(self.path)
+        other = new_invoice("order-2", "example-address", "2", 100, 200)
+        with self.assertRaises(JournalError):
+            self.journal.register(other)
+
     def test_record_and_duplicate_idempotence(self):
         self.assertTrue(self.journal.record("order-1", TX, "1.25", 6, BLOCK_A,
                                             "candidate_paid", observed_at=120))
